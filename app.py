@@ -1,6 +1,7 @@
 import streamlit as st
 import pickle
 import requests
+import pandas as pd
 import streamlit.components.v1 as components
 
 # --- Fetch poster with error handling ---
@@ -22,6 +23,7 @@ def fetch_poster(movie_id):
 # --- Load Data ---
 movies = pickle.load(open("movies_list.pkl", 'rb'))
 similarity = pickle.load(open("similarity.pkl", 'rb'))
+movies_list = movies['title'].values
 
 # Clean and get unique movie titles
 movies['title_clean'] = movies['title'].str.strip().str.lower()
@@ -52,20 +54,20 @@ def recommend(movie_title_input):
         return [], []
 
     index = match.index[0]
-    distances = list(enumerate(similarity[index]))
-    sorted_distances = sorted(distances, reverse=True, key=lambda x: x[1])
-
+    
+    # Get top 5 similar movies from precomputed similarity data
+    similar_indices = similarity.get(index, [])
+    
     recommend_movie = []
     recommend_poster = []
-
-    for i in sorted_distances[1:11]:  # Check more in case some posters fail
-        movie_id = movies.iloc[i[0]].id
+    
+    # Fetch top 5 movie recommendations
+    for i in similar_indices[:5]:  # Get up to 5 similar movies
+        movie_id = movies.iloc[i].id
         poster_url = fetch_poster(movie_id)
         if poster_url:
-            recommend_movie.append(movies.iloc[i[0]].title)
+            recommend_movie.append(movies.iloc[i].title)
             recommend_poster.append(poster_url)
-        if len(recommend_movie) == 5:
-            break
 
     st.write(f"✅ Found {len(recommend_movie)} recommendations for '{movie_title_input}'.")
     return recommend_movie, recommend_poster
@@ -82,3 +84,4 @@ if st.button("Show Recommend"):
             with cols[i]:
                 st.text(movie_name[i])
                 st.image(movie_poster[i])
+

@@ -22,9 +22,10 @@ def fetch_poster(movie_id):
 # --- Load Data ---
 movies = pickle.load(open("movies_list.pkl", 'rb'))
 similarity = pickle.load(open("similarity.pkl", 'rb'))
-movies_list = movies['title'].values
 
-# --- App Title ---
+# Clean and get unique movie titles
+movies['title_clean'] = movies['title'].str.strip().str.lower()
+unique_titles = sorted(set(movies['title'].str.strip()))
 st.header("🎬 Movie Recommender System")
 
 # --- Image Carousel Component ---
@@ -34,28 +35,42 @@ imageCarouselComponent = components.declare_component("image-carousel-component"
 static_movie_ids = [1632, 299536, 17455, 2830, 429422, 9722, 13972, 240, 155, 598, 914, 255709, 572154]
 imageUrls = [fetch_poster(mid) for mid in static_movie_ids]
 imageUrls = [url for url in imageUrls if url]  # filter out None
-
 imageCarouselComponent(imageUrls=imageUrls, height=200)
 
 # --- Movie Selector ---
-selectvalue = st.selectbox("🎞️ Select a movie", movies_list)
+selectvalue = st.selectbox("🎞️ Select a movie", unique_titles)
 
 # --- Recommendation Function ---
-def recommend(movie):
-    index = movies[movies['title'] == movie].index[0]
-    distance = sorted(list(enumerate(similarity[index])), reverse=True, key=lambda vector: vector[1])
+def recommend(movie_title_input):
+    # Normalize selected title
+    movie_title_clean = movie_title_input.strip().lower()
+    
+    # Find matching movie row
+    match = movies[movies['title_clean'] == movie_title_clean]
+    if match.empty:
+        st.error("❌ Selected movie not found in dataset.")
+        return [], []
+
+    index = match.index[0]
+    distances = list(enumerate(similarity[index]))
+    sorted_distances = sorted(distances, reverse=True, key=lambda x: x[1])
+
     recommend_movie = []
     recommend_poster = []
-    for i in distance[1:6]:
+
+    for i in sorted_distances[1:11]:  # Check more in case some posters fail
         movie_id = movies.iloc[i[0]].id
         poster_url = fetch_poster(movie_id)
         if poster_url:
             recommend_movie.append(movies.iloc[i[0]].title)
             recommend_poster.append(poster_url)
-    st.write(f"✅ Found {len(recommend_movie)} recommendations.")
+        if len(recommend_movie) == 5:
+            break
+
+    st.write(f"✅ Found {len(recommend_movie)} recommendations for '{movie_title_input}'.")
     return recommend_movie, recommend_poster
 
-# --- Show Recommendations (Safe version) ---
+# --- Show Recommendations Safely ---
 if st.button("Show Recommend"):
     movie_name, movie_poster = recommend(selectvalue)
 
